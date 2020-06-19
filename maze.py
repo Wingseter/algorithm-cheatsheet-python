@@ -3,7 +3,7 @@ from tkinter import Button
 import time
 import numpy as np
 from PIL import ImageTk, Image
-from os import *
+# from os import *
 
 PhotoImage = ImageTk.PhotoImage
 UNIT = 100 # 유닛 크기
@@ -48,14 +48,14 @@ class GraphicDisplay(tk.Tk):
         canvas.create_window(WIDTH * UNIT * 0.37, HEIGHT * UNIT + 10, window =policy_button)
 
         # move 버튼
-        move_button = Button(self, text = "move", command = self.improve_policy)
+        move_button = Button(self, text = "move", command = self.move_by_policy)
         move_button.configure(width = 10, activebackground = "#33B5E5")
-        canvas.create_window(WIDTH * UNIT * 0.62, HEIGHT * UNIT + 10, window =policy_button)
+        canvas.create_window(WIDTH * UNIT * 0.62, HEIGHT * UNIT + 10, window =move_button)
 
         #reset 버튼
-        reset_button = Button(self, text = "reset", command = self.improve_policy)
+        reset_button = Button(self, text = "reset", command = self.reset)
         reset_button.configure(width = 10, activebackground = "#33B5E5")
-        canvas.create_window(WIDTH * UNIT * 0.87, HEIGHT * UNIT + 10, window =policy_button)
+        canvas.create_window(WIDTH * UNIT * 0.87, HEIGHT * UNIT + 10, window =reset_button)
 
         # 그리드 생성
         for col in range(0, WIDTH * UNIT, UNIT):            # 가로 선 긋기
@@ -65,10 +65,10 @@ class GraphicDisplay(tk.Tk):
             x0, y0, x1, y1 = 0, row, HEIGHT * UNIT , row
             canvas.create_line(x0, y0, x1, y1)
 
-        self.rectangle = canvas.create_image(50, 50, image=self.shapes[0])
+        self.player = canvas.create_image(50, 50, image=self.shapes[0])
         canvas.create_image(250, 150, image=self.shapes[1])
         canvas.create_image(150, 250, image=self.shapes[1])
-        canvas.create_image(250, 250, image=self.shape[2])
+        canvas.create_image(250, 250, image=self.shapes[2])
 
         canvas.pack()
 
@@ -119,7 +119,7 @@ class GraphicDisplay(tk.Tk):
         reward_text = self.canvas.create_text(x, y, fill="black", text = contents, font = font, anchor = anchor)
         return self.texts.append(reward_text)
 
-    # 플레이어 움직이기!
+    # 플레이어 움직이기
     def player_move(self,action):
         base_action = np.array([0, 0])
         location = self.find_player()
@@ -132,12 +132,14 @@ class GraphicDisplay(tk.Tk):
             base_action[0] -= UNIT
         elif action == 3 and location[1] < WIDTH - 1: # 우
             base_action[0] += UNIT
+        # 플레이어 움직임
+        self.canvas.move(self.player, base_action[0], base_action[1])
 
     # 현제 플레이어의 위치
     def find_player(self):
         temp =self.canvas.coords(self.player)
-        x = (temp[0] / UNIT) - 0.5
-        y = (temp[1] / UNIT) - 0.5
+        x = (temp[0] / 100) - 0.5
+        y = (temp[1] / 100) - 0.5
         return int(y), int(x)
 
     # 움직임을 받아와서 움직인다.
@@ -167,11 +169,11 @@ class GraphicDisplay(tk.Tk):
             origin_x, origin_y = 50 + (UNIT * row), 90 + (UNIT * col)
             self.arrows.append(self.canvas.create_image(origin_x, origin_y, image=self.down))
 
-        if policy[1] > 0: # 왼쪽으로 향하는 화살표
+        if policy[2] > 0: # 왼쪽으로 향하는 화살표
             origin_x, origin_y = 10 + (UNIT * row), 50 + (UNIT * col)
             self.arrows.append(self.canvas.create_image(origin_x, origin_y, image=self.left))
 
-        if policy[1] > 0: # 오른쪽으로 향하는 화살표
+        if policy[3] > 0: # 오른쪽으로 향하는 화살표
             origin_x, origin_y = 90 + (UNIT * row), 50 + (UNIT * col)
             self.arrows.append(self.canvas.create_image(origin_x, origin_y, image=self.right))
 
@@ -190,6 +192,13 @@ class GraphicDisplay(tk.Tk):
         time.sleep(0.1)
         self.canvas.tag_raise(self.player)
         self.update()
+
+    def evaluate_policy(self):
+        self.evaluation_count += 1
+        for i in self.texts:
+            self.canvas.delete(i)
+        self.agent.policy_evaluation()
+        self.print_value_table(self.agent.value_table)
     
     def improve_policy(self):
         self.improvement_count += 1
@@ -219,7 +228,7 @@ class Env:
         next_state = self.state_after_action(state, action)
         return self.reward[next_state[0]][next_state[1]]
 
-    def state_after_action(self,state, action_index):
+    def state_after_action(self, state, action_index):
         action = ACTIONS[action_index]
         return self.check_boundary([state[0] + action[0], state[1] + action[1]])
 
@@ -232,7 +241,7 @@ class Env:
     def get_transition_prob(self, state, action):
         return self.transition_probability
 
-    def get_all_sates(self):
+    def get_all_states(self):
         return self.all_state
 
 
